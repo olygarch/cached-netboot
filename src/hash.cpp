@@ -167,32 +167,51 @@ sha224_t SHA224::get() {
     return result;
 }
 
-RollHash::RollHash(size_t wlen) {
+Hasher::Hasher(size_t wlen) {
     size_t i = 0;
     window_length = wlen;
-    window_pos = 0;
-    window = new uint8_t[wlen];
+    window_start = 0;
+    window_end = 0;
+    window = new uint8_t[wlen*2];
     mult = 1;
     for (i=0; i<window_length; i++) mult *= MULTIPLIER;
 }
 
-RollHash::~RollHash() {
+Hasher::~Hasher() {
     delete window;
 }
 
-void RollHash::update(uint8_t* begin, uint8_t* end) {
-    for (uint8_t *cur = begin; cur < end; cur++) {
-        hash -= mult * window[window_pos];
+void Hasher::update(const uint8_t* begin, const uint8_t* end) {
+    for (const uint8_t* cur = begin; cur != end; cur++) {
+        if (window_end - window_start >= window_length) {
+            hash -= mult * window[window_start];
+        }
         hash *= MULTIPLIER;
         hash += *cur;
-        window[window_pos++] = *cur;
-        if (window_pos == window_length)
-            window_pos = 0;
+        window[window_end++] = *cur;
+        if (window_end - window_start > window_length) window_start++;
+        if (window_end == window_length*2) {
+            for (size_t i=0; i<window_length; i++) {
+                window[i] = window[window_length+i];
+            }
+            window_start = 0;
+            window_end = window_length;
+        }
     }
 }
 
-rollh_t RollHash::get() {
+rollh_t Hasher::get_weak_hash() const {
     rollh_t result;
     memcpy(&result[0], &hash, sizeof hash);
     return result;
+}
+
+hash_t Hasher::get_strong_hash() const {
+    SHA224 strong_hash;
+    strong_hash.update(window+window_start, window+window_end);
+    return {get_weak_hash(), strong_hash.get()};
+}
+
+Chunk Hasher::get_chunk() const {
+    return {window+window_start, window+window_end};
 }
