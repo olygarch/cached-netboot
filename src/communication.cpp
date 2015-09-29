@@ -14,14 +14,14 @@ static uint32_t read_uint32_t(tcp::socket& socket, boost::asio::yield_context yi
 }
 
 static void write_string(tcp::socket& socket, boost::asio::yield_context yield, const std::string& str) {
-    write_uint32_t(socket, yield, str.size()-1);
-    boost::asio::async_write(socket, boost::asio::buffer(&str[0], str.size()-1), yield);
+    write_uint32_t(socket, yield, str.size());
+    boost::asio::async_write(socket, boost::asio::buffer(&str[0], str.size()), yield);
 }
 
 static std::string read_string(tcp::socket& socket, boost::asio::yield_context yield) {
     size_t size = read_uint32_t(socket, yield);
     std::string str;
-    str.resize(size+1);
+    str.resize(size);
     boost::asio::async_read(socket, boost::asio::buffer(&str[0], size), yield);
     return str;
 }

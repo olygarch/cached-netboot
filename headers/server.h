@@ -111,7 +111,7 @@ void Server<UI>::run() {
     boost::asio::io_service io_service;
 
     for (auto&& x: directory_iterator(base_dir)) {
-        const std::string& filename = x.path().filename().string();
+        std::string filename = x.path().filename().string();
         if (!is_regular_file(x.path())) continue;
         const std::vector<hash_t>& chunk_list = File(x.path().string()).get_chunk_list();
         files.emplace(
