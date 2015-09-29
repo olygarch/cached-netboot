@@ -110,21 +110,24 @@ void Server<UI>::run() {
     using namespace std::placeholders;
     boost::asio::io_service io_service;
 
+    ui.log("Generating file list...");
     for (auto&& x: directory_iterator(base_dir)) {
         std::string filename = x.path().filename().string();
         if (!is_regular_file(x.path())) continue;
+        ui.log("Found " + filename);
         const std::vector<hash_t>& chunk_list = File(x.path().string()).get_chunk_list();
         files.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(filename),
             std::forward_as_tuple(filename, chunk_list.begin(), chunk_list.end()));
     }
+    ui.log("File list complete!");
 
     auto send_chunk_sender = [this] (address addr, hash_t chunk, boost::asio::yield_context yield) {
         try {
             send_packet(clients.at(addr).socket, yield, SendChunkPacket(addr, chunk));
         } catch (std::exception& e) {
-            fprintf(stderr, "Error sending command: %s", e.what());
+            ui.log("Error sending command: " + std::string(e.what()));
         }
     };
 
@@ -157,19 +160,19 @@ void Server<UI>::run() {
                         NewChunkPacket packet(socket, yield);
                         clients.at(addr).chunks_owned.insert(packet.chunk);
                         is_busy.erase(addr);
-                        ui.report_client_status(clients);
                         break;
                     }
                     case error: {
-                        fprintf(stderr, "Received error from client: %s\n", ErrorPacket(socket, yield).get_as_string().c_str());
+                        ui.log("Received error from client: " + ErrorPacket(socket, yield).get_as_string());
                         break;
                     }
                     default: {
-                        fprintf(stderr, "Unknown packet type from client: %d\n", (int) type);
+                        ui.log("Unknown packet type from client: " + std::to_string(type));
                         ErrorPacket answer(unknown_packet);
                         send_packet(socket, yield, answer);
                     }
                 }
+                ui.report_client_status(clients);
                 if (is_busy.empty()) {
                     for (auto& x: get_chunks_to_send()) {
                         boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.second.first, x.second.second, _1));
@@ -178,7 +181,7 @@ void Server<UI>::run() {
                 }
             }
         } catch (std::exception& e) {
-            fprintf(stderr, "Error handling client: %s", e.what());
+            ui.log("Error handling client: " + std::string(e.what()));
             clients.erase(addr);
             is_busy.erase(addr);
             if (is_busy.empty()) {
@@ -196,12 +199,13 @@ void Server<UI>::run() {
             for (;;) {
                 tcp::socket socket(io_service);
                 acceptor.async_accept(socket, yield);
+                fprintf(stderr, "Client connected!");
                 address addr = socket.remote_endpoint().address();
                 clients.emplace(addr, std::move(ClientStatus(std::move(socket), io_service)));
                 boost::asio::spawn(io_service, std::bind(client_manager, addr, _1));
             }
         } catch (const std::exception& e) {
-            fprintf(stderr, "Client accept: %s\n", e.what());
+            ui.log("Client accept: " + std::string(e.what()));
         }
     };
 

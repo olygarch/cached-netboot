@@ -43,7 +43,7 @@ void Client<UI>::run(bool forever) {
             peer_socket.async_connect(tcp::endpoint(packet.receiver, client_port), yield);
             send_packet(peer_socket, yield, output);
         } catch (const std::exception& e) {
-            fprintf(stderr, "Send packet: %s\n", e.what());
+            ui.log("Send packet: " + std::string(e.what()));
         }
     };
 
@@ -78,26 +78,26 @@ void Client<UI>::run(bool forever) {
                         break;
                     }
                     case error: {
-                        fprintf(stderr, "Received error from server: %s\n", ErrorPacket(server_socket, yield).get_as_string().c_str());
+                        ui.log("Received error from server: " + ErrorPacket(server_socket, yield).get_as_string());
                         break;
                     }
                     default: {
-                        fprintf(stderr, "Unknown packet type from server: %d\n", (int) type);
+                        ui.log("Unknown packet type from server: " + std::to_string(type));
                         ErrorPacket answer(unknown_packet);
                         send_packet(server_socket, yield, answer);
                     }
                 }
             }
         } catch (const std::exception& e) {
-            fprintf(stderr, "Server communication: %s\n", e.what());
+            ui.log("Server communication: " + std::string(e.what()));
         }
     };
 
-    auto new_chunk_sender = [&server_socket] (const hash_t& hash, boost::asio::yield_context yield) {
+    auto new_chunk_sender = [this, &server_socket] (const hash_t& hash, boost::asio::yield_context yield) {
         try {
             send_packet(server_socket, yield, NewChunkPacket(hash));
         } catch (const std::exception& e) {
-            fprintf(stderr, "Error sending update to server: %s\n", e.what());
+            ui.log("Error sending update to server: " + std::string(e.what()));
         }
     };
 
@@ -110,36 +110,37 @@ void Client<UI>::run(bool forever) {
                         ChunkDataPacket packet(socket, yield);
                         const hash_t& hash = packet.get_chunk().get_hash();
                         if (!chunk_files.count(hash)) {
-                            fprintf(stderr, "Unknown chunk received!\n");
+                            ui.log("Unknown chunk received!");
                             break;
                         }
                         for (auto x: chunk_files.at(hash)) {
                             x->write_chunk(packet.get_chunk(), hash);
                         }
                         boost::asio::spawn(server_strand, std::bind(new_chunk_sender, hash, _1));
-                        ui.report_status(files);
                         break;
                     }
                     case error: {
-                        fprintf(stderr, "Received error from client: %s\n", ErrorPacket(socket, yield).get_as_string().c_str());
+                        ui.log("Received error from client: " + ErrorPacket(socket, yield).get_as_string());
                         break;
                     }
                     default: {
-                        fprintf(stderr, "Unknown packet type from client: %d\n", (int) type);
+                        ui.log("Unknown packet type from client: " + std::to_string(type));
                     }
                 }
+                ui.report_status(files);
                 if (forever) continue;
                 if (chunk_files.size() == present_chunks.size()) {
+                    ui.log("Stopping...");
                     io_service.stop();
                     break;
                 }
             }
         } catch (const std::exception& e) {
-            fprintf(stderr, "Client communication: %s\n", e.what());
+            ui.log("Client communication: " + std::string(e.what()));
         }
     };
 
-    auto peer_connect_listener = [&io_service, &peer_connect_handler] (boost::asio::yield_context yield) {
+    auto peer_connect_listener = [this, &io_service, &peer_connect_handler] (boost::asio::yield_context yield) {
         try {
             tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), client_port));
             for (;;) {
@@ -148,7 +149,7 @@ void Client<UI>::run(bool forever) {
                 boost::asio::spawn(io_service, std::bind(peer_connect_handler, std::move(socket), _1));
             }
         } catch (const std::exception& e) {
-            fprintf(stderr, "Client accept: %s\n", e.what());
+            ui.log("Client accept: " + std::string(e.what()));
         }
     };
 

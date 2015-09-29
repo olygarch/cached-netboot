@@ -16,6 +16,10 @@ BasicUI::BasicUI(const std::vector<std::string>& header_lines) {
     }
 }
 
+void BasicUI::log(const std::string& message) {
+    print_line(message, true);
+}
+
 void BasicUI::report_client_status(const std::unordered_map<address, ClientStatus>& clients) {
     size_t clients_done = 0;
     for (auto& x: clients) {
@@ -42,35 +46,56 @@ ANSIUI::ANSIUI(const std::vector<std::string>& header_lines) {
         fputs(l.c_str(), stdout);
         fputs("\n", stdout);
     }
+    write_ui();
 }
 
-void ANSIUI::print_lines(const std::vector<std::string>& lines) {
-    for (size_t i=0; i<last_line_no; i++) {
+void ANSIUI::clear_ui() {
+    for (size_t i=0; i<status.size()+logs.size()+1; i++) {
         fputs("\033[1F\033[2L", stdout);
     }
-    for (auto& x: lines) {
+}
+
+void ANSIUI::write_ui() {
+    for (auto& x: status) {
         fputs(x.c_str(), stdout);
         fputs("\n", stdout);
     }
-    last_line_no = lines.size();
+    fputs("\n", stdout);
+    for (auto& x: logs) {
+        fputs(x.c_str(), stdout);
+        fputs("\n", stdout);
+    }
 }
 
 void ANSIUI::report_client_status(const std::unordered_map<address, ClientStatus>& clients) {
+    clear_ui();
     std::vector<std::string> status;
     for (auto& x: clients) {
         std::string address = x.first.to_string();
         address.resize(40, ' ');
         status.push_back(address + std::to_string(x.second.chunks_owned.size()) + " of " + std::to_string(x.second.chunks_needed.size()) + " chunks done");
     }
-    print_lines(status);
+    this->status.swap(status);
+    write_ui();
 }
 
 void ANSIUI::report_status(const std::unordered_map<std::string, File>& files) {
+    clear_ui();
     std::vector<std::string> status;
     for (auto& x: files) {
         std::string filename = x.first;
         filename.resize(40, ' ');
         status.push_back(filename + std::to_string(x.second.count_present_chunks()) + " of " + std::to_string(x.second.count_total_chunks()) + " chunks");
     }
-    print_lines(status);
+    this->status.swap(status);
+    write_ui();
+}
+
+void ANSIUI::log(const std::string& message) {
+    clear_ui();
+    logs.push_back(message);
+    if (logs.size() > 10) {
+        logs.pop_front();
+    }
+    write_ui();
 }
