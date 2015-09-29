@@ -87,6 +87,7 @@ void Client<UI>::run(bool forever) {
                         send_packet(server_socket, yield, answer);
                     }
                 }
+                ui.report_status(files);
             }
         } catch (const std::exception& e) {
             ui.log("Server communication: " + std::string(e.what()));

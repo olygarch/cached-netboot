@@ -1,5 +1,6 @@
 #include "ui.h"
 #include <stdio.h>
+#include <unistd.h>
 
 void BasicUI::print_line(const std::string& line, bool keep) {
     fputs(line.c_str(), stdout);
@@ -51,7 +52,7 @@ ANSIUI::ANSIUI(const std::vector<std::string>& header_lines) {
 
 void ANSIUI::clear_ui() {
     for (size_t i=0; i<status.size()+logs.size()+1; i++) {
-        fputs("\033[1F\033[2L", stdout);
+        fputs("\033[1F\033[2K", stdout);
     }
 }
 
