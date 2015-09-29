@@ -10,12 +10,15 @@ OBJECTS=$(SOURCES:src/%.cpp=build/%.o)
 
 .PHONY: all clean
 
-all: ${OBJECTS} build/server build/client
+all: ${OBJECTS} build/server build/client build/terminating_client
 
 build/%.o: src/%.cpp ${HEADERS}
 	${GXX} -c ${INCLUDES} ${CXXFLAGS} $< -o $@
 
 build/client: build/client.o build/common.o build/communication.o build/file.o build/hash.o build/ui.o
+	${GXX} -o $@ ${CXXFLAGS} ${LDFLAGS} $^ ${LIBS}
+
+build/terminating_client: build/terminating_client.o build/common.o build/communication.o build/file.o build/hash.o build/ui.o
 	${GXX} -o $@ ${CXXFLAGS} ${LDFLAGS} $^ ${LIBS}
 
 build/server: build/server.o build/common.o build/communication.o build/file.o build/hash.o build/ui.o
