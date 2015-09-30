@@ -48,7 +48,7 @@ Chunk File::get_chunk_data(const hash_t& hash) const {
 }
 
 void File::write_chunk(Chunk data, const hash_t& hash) {
-    write_chunk(data, hash, {});
+    write_chunk(data, hash, std::unordered_set<uint8_t*>());
 }
 
 void File::set_chunks_from_list(const std::vector<hash_t>& chunks) {
