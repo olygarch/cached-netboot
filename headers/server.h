@@ -111,15 +111,15 @@ void Server<UI>::run() {
     boost::asio::io_service io_service;
 
     ui.log("Generating file list...");
-    for (auto&& x: directory_iterator(base_dir)) {
-        std::string filename = x.path().filename().string();
-        if (!is_regular_file(x.path())) continue;
+    for (auto x = directory_iterator(base_dir); x != directory_iterator(); x++) {
+        std::string filename = x->path().filename().string();
+        if (!is_regular_file(x->path())) continue;
         ui.log("Found " + filename);
-        const std::vector<hash_t>& chunk_list = File(x.path().string()).get_chunk_list();
+        const std::vector<hash_t>& chunk_list = File(x->path().string()).get_chunk_list();
         files.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(filename),
-            std::forward_as_tuple(filename, file_size(x), chunk_list.begin(), chunk_list.end()));
+            std::forward_as_tuple(filename, file_size(*x), chunk_list.begin(), chunk_list.end()));
     }
     ui.log("File list complete!");
 
