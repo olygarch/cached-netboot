@@ -123,9 +123,9 @@ void Server<UI>::run() {
     }
     ui.log("File list complete!");
 
-    auto send_chunk_sender = [this] (address addr, hash_t chunk, boost::asio::yield_context yield) {
+    auto send_chunk_sender = [this] (address send, address dest, hash_t chunk, boost::asio::yield_context yield) {
         try {
-            send_packet(clients.at(addr).socket, yield, SendChunkPacket(addr, chunk));
+            send_packet(clients.at(send).socket, yield, SendChunkPacket(dest, chunk));
         } catch (std::exception& e) {
             ui.log("Error sending command: " + std::string(e.what()));
         }
@@ -175,7 +175,7 @@ void Server<UI>::run() {
                 ui.report_client_status(clients);
                 if (is_busy.empty()) {
                     for (auto& x: get_chunks_to_send()) {
-                        boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.second.first, x.second.second, _1));
+                        boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.first, x.second.first, x.second.second, _1));
                         is_busy.insert(x.second.first);
                     }
                 }
@@ -186,7 +186,7 @@ void Server<UI>::run() {
             is_busy.erase(addr);
             if (is_busy.empty()) {
                 for (auto& x: get_chunks_to_send()) {
-                    boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.second.first, x.second.second, _1));
+                    boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.first, x.second.first, x.second.second, _1));
                     is_busy.insert(x.second.first);
                 }
             }

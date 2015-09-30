@@ -8,9 +8,9 @@ hash_t::hash_t(tcp::socket& socket, boost::asio::yield_context yield) {
     boost::asio::async_read(socket, boost::asio::buffer(strong_hash), yield);
 }
 
-void hash_t::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    boost::asio::async_write(socket, boost::asio::buffer(&weak_hash, 4), yield);
-    boost::asio::async_write(socket, boost::asio::buffer(strong_hash), yield);
+void hash_t::add_buffers(std::vector<boost::asio::const_buffer>& buffers) const {
+    buffers.emplace_back(&weak_hash, 4);
+    buffers.emplace_back(&strong_hash[0], 28);
 }
 
 void hash_t::print() const {

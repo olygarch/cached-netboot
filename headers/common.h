@@ -20,7 +20,7 @@ struct hash_t {
     hash_t() {}
     hash_t(tcp::socket& socket, boost::asio::yield_context yield);
     hash_t(uint32_t weak, sha224_t strong): weak_hash(weak), strong_hash(strong) {}
-    void write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const;
+    void add_buffers(std::vector<boost::asio::const_buffer>& buffers) const;
     bool operator==(const hash_t& other) const {
         return weak_hash == other.weak_hash && strong_hash == other.strong_hash;
     }

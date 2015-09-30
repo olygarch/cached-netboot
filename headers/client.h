@@ -36,7 +36,7 @@ void Client<UI>::run(bool forever) {
     tcp::socket server_socket(io_service);
     boost::asio::io_service::strand server_strand(io_service);
 
-    auto chunk_data_sender = [this, &io_service] (const SendChunkPacket& packet, boost::asio::yield_context yield) {
+    auto chunk_data_sender = [this, &io_service] (SendChunkPacket packet, boost::asio::yield_context yield) {
         try {
             ChunkDataPacket output(chunk_files[packet.chunk][0]->get_chunk_data(packet.chunk));
             tcp::socket peer_socket(io_service);

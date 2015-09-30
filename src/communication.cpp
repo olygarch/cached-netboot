@@ -2,20 +2,10 @@
 #include "common.h"
 #include <string.h>
 
-static void write_uint32_t(tcp::socket& socket, boost::asio::yield_context yield, uint32_t val) {
-    uint32_t netval = htonl(val);
-    boost::asio::async_write(socket, boost::asio::buffer(&netval, 4), yield);
-}
-
 static uint32_t read_uint32_t(tcp::socket& socket, boost::asio::yield_context yield) {
     uint32_t netval;
     boost::asio::async_read(socket, boost::asio::buffer(&netval, 4), yield);
     return ntohl(netval);
-}
-
-static void write_string(tcp::socket& socket, boost::asio::yield_context yield, const std::string& str) {
-    write_uint32_t(socket, yield, str.size());
-    boost::asio::async_write(socket, boost::asio::buffer(&str[0], str.size()), yield);
 }
 
 static std::string read_string(tcp::socket& socket, boost::asio::yield_context yield) {
@@ -45,9 +35,10 @@ hash_t ChunkDataPacket::get_hash() const {
 }
 */
 
-void ChunkDataPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    write_uint32_t(socket, yield, data.size());
-    boost::asio::async_write(socket, boost::asio::buffer(&data[0], data.size()), yield);
+void ChunkDataPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    netlength = htonl(data.size());
+    buffers.emplace_back(&netlength, 4);
+    buffers.emplace_back(&data[0], data.size());
 }
 
 Chunk ChunkDataPacket::get_chunk() const {
@@ -61,54 +52,64 @@ ChunkListPacket::ChunkListPacket(tcp::socket& socket, boost::asio::yield_context
     }
 }
 
-void ChunkListPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    write_uint32_t(socket, yield, chunks.size());
-    for (auto chunk: chunks) {
-        chunk.write_to_socket(socket, yield);
+void ChunkListPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    netlength = htonl(chunks.size());
+    buffers.emplace_back(&netlength, 4);
+    for (auto& chunk: chunks) {
+        chunk.add_buffers(buffers);
     }
 }
 
-void NewChunkPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    chunk.write_to_socket(socket, yield);
+void NewChunkPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    chunk.add_buffers(buffers);
 }
 
 SendChunkPacket::SendChunkPacket(tcp::socket& socket, boost::asio::yield_context yield) {
-    receiver.from_string(read_string(socket, yield));
+    receiver_str = read_string(socket, yield);
+    receiver = address::from_string(receiver_str);
     chunk = hash_t(socket, yield);
 }
 
-void SendChunkPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    write_string(socket, yield, receiver.to_string());
-    chunk.write_to_socket(socket, yield);
+void SendChunkPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    receiver_str = receiver.to_string();
+    netlength = htonl(receiver_str.size());
+    buffers.emplace_back(&netlength, 4);
+    buffers.emplace_back(&receiver_str[0], receiver_str.size());
+    chunk.add_buffers(buffers);
 }
-
 
 GetFilePacket::GetFilePacket(tcp::socket& socket, boost::asio::yield_context yield) {
     name = read_string(socket, yield);
 }
 
-void GetFilePacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    write_string(socket, yield, name);
+void GetFilePacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    netlength = htonl(name.size());
+    buffers.emplace_back(&netlength, 4);
+    buffers.emplace_back(&name[0], name.size());
 }
 
 FileInfoPacket::FileInfoPacket(tcp::socket& socket, boost::asio::yield_context yield) {
     name = read_string(socket, yield);
-    size = read_uint32_t(socket, yield);
+    boost::asio::async_read(socket, boost::asio::buffer(&netfsize, 8), yield);
+    size = be64toh(netfsize);
     chunk_list = ChunkListPacket(socket, yield);
 }
 
-void FileInfoPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    write_string(socket, yield, name);
-    write_uint32_t(socket, yield, size);
-    chunk_list.write_to_socket(socket, yield);
+void FileInfoPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    netlength = htonl(name.size());
+    netfsize = htobe64(size);
+    buffers.emplace_back(&netlength, 4);
+    buffers.emplace_back(&name[0], name.size());
+    buffers.emplace_back(&netfsize, 8);
+    chunk_list.add_buffers(buffers);
 }
 
 ErrorPacket::ErrorPacket(tcp::socket& socket, boost::asio::yield_context yield) {
     boost::asio::async_read(socket, boost::asio::buffer(&code, 1), yield);
 }
 
-void ErrorPacket::write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const {
-    boost::asio::async_write(socket, boost::asio::buffer(&code, 1), yield);
+void ErrorPacket::add_buffers(std::vector<boost::asio::const_buffer>& buffers) {
+    buffers.emplace_back(&code, 1);
 }
 
 const std::string ErrorPacket::get_as_string() const {
