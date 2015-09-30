@@ -32,6 +32,7 @@ using namespace boost::filesystem;
 
 template<class UI>
 std::unordered_map<address, std::pair<address, hash_t>> Server<UI>::get_chunks_to_send() const {
+    volatile size_t client_no = clients.size();
     std::unordered_map<address, size_t> addr_to_id;
     std::vector<address> id_to_addr;
     for (auto& c: clients) {
@@ -39,7 +40,7 @@ std::unordered_map<address, std::pair<address, hash_t>> Server<UI>::get_chunks_t
         id_to_addr.push_back(c.first);
     }
     std::vector<std::vector<int>> fw_graph;
-    fw_graph.resize(clients.size());
+    fw_graph.resize(client_no);
     for (auto& c: clients) {
         for (auto& oth: clients) {
             for (auto& chunk: c.second.chunks_owned) {
@@ -51,12 +52,12 @@ std::unordered_map<address, std::pair<address, hash_t>> Server<UI>::get_chunks_t
         }
     }
 
-    std::vector<int> fw_match(clients.size(), -1);
-    std::vector<int> bw_match(clients.size(), -1);
+    std::vector<int> fw_match(client_no, -1);
+    std::vector<int> bw_match(client_no, -1);
     for (;;) {
-        std::vector<int> parent(clients.size(), -1);
+        std::vector<int> parent(client_no, -1);
         bool improved = false;
-        for (size_t i=0; i<clients.size(); i++) {
+        for (size_t i=0; i<client_no; i++) {
             if (fw_match[i] != -1) continue;
             std::queue<int> q;
             q.push(i);
@@ -79,7 +80,7 @@ std::unordered_map<address, std::pair<address, hash_t>> Server<UI>::get_chunks_t
             }
             while (augmenting != -1) {
                 improved = true;
-                int next = fw_match[augmenting];
+                int next = fw_match[parent[augmenting]];
                 bw_match[augmenting] = parent[augmenting];
                 fw_match[parent[augmenting]] = augmenting;
                 augmenting = next;
@@ -89,7 +90,7 @@ std::unordered_map<address, std::pair<address, hash_t>> Server<UI>::get_chunks_t
     }
 
     std::unordered_map<address, std::pair<address, hash_t>> res;
-    for (size_t i=0; i<clients.size(); i++) {
+    for (size_t i=0; i<client_no; i++) {
         if (fw_match[i] == -1) continue;
         address sender = id_to_addr[i];
         address receiver = id_to_addr[fw_match[i]];
@@ -187,16 +188,20 @@ void Server<UI>::run() {
                 }
             }
         } catch (std::exception& e) {
-            ui.log("Error handling client: " + std::string(e.what()));
-            clients.erase(addr);
-            if (is_busy.count(addr)) {
-                is_busy.erase(is_busy.find(addr));
-            }
-            if (is_busy.empty()) {
-                for (auto& x: get_chunks_to_send()) {
-                    boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.first, x.second.first, x.second.second, _1));
-                    is_busy.insert(x.second.first);
+            try {
+                ui.log("Error handling client: " + std::string(e.what()));
+                clients.erase(addr);
+                if (is_busy.count(addr)) {
+                    is_busy.erase(is_busy.find(addr));
                 }
+                if (is_busy.empty()) {
+                    for (auto& x: get_chunks_to_send()) {
+                        boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.first, x.second.first, x.second.second, _1));
+                        is_busy.insert(x.second.first);
+                    }
+                }
+            } catch (std::exception& e) {
+                ui.log("Error handling exception: " + std::string(e.what()));
             }
         }
     };

@@ -1,7 +1,7 @@
 GXX=g++
 INCLUDES=-Iheaders
-CXXFLAGS=-Os -Wall -std=c++11 -flto
-LDFLAGS=-Wl,--as-needed -Wl,-O1 -flto
+CXXFLAGS=-Os -Wall -std=c++11 -ggdb #-flto
+LDFLAGS=-Wl,--as-needed -Wl,-O1 #-flto
 LIBS=-lboost_system -lboost_filesystem -lboost_iostreams -lboost_coroutine -lboost_context
 
 HEADERS=$(wildcard headers/*.h)

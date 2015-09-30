@@ -36,7 +36,7 @@ SHA224::SHA224() {
     H = temp1 + temp2; \
 }
 
-void SHA224::process(uint8_t* start, uint8_t* end) {
+void SHA224::process(const uint8_t* start, const uint8_t* end) {
     register uint32_t a, b, c, d, e, f, g, h;
     uint32_t temp1, temp2, tm;
     uint32_t w[16];
@@ -130,7 +130,7 @@ void SHA224::process(uint8_t* start, uint8_t* end) {
     }
 }
 
-void SHA224::update(uint8_t* start, uint8_t* end) {
+void SHA224::update(const uint8_t* start, const uint8_t* end) {
     if (buff_used) {
         int8_t to_copy = 64 - buff_used;
         if (to_copy > (end - start)) to_copy = end - start;
@@ -172,14 +172,10 @@ Hasher::Hasher(size_t wlen) {
     window_length = wlen;
     window_start = 0;
     window_end = 0;
-    window = new uint8_t[wlen*2];
+    window.resize(wlen*2);
     mult = 1;
     for (i=1; i<window_length; i++) mult *= MULTIPLIER;
     hash = 0;
-}
-
-Hasher::~Hasher() {
-    delete window;
 }
 
 void Hasher::update(const uint8_t* begin, const uint8_t* end) {
@@ -207,10 +203,10 @@ uint32_t Hasher::get_weak_hash() const {
 
 hash_t Hasher::get_strong_hash() const {
     SHA224 strong_hash;
-    strong_hash.update(window+window_start, window+window_end);
+    strong_hash.update(&window[window_start], &window[window_end]);
     return {get_weak_hash(), strong_hash.get()};
 }
 
 Chunk Hasher::get_chunk() const {
-    return {window+window_start, window+window_end};
+    return {&window[window_start], &window[window_end]};
 }
