@@ -87,7 +87,7 @@ public:
     uint32_t size;
     ChunkListPacket chunk_list;
     template<typename Iterator, typename boost::enable_if<boost::is_same<typename std::iterator_traits<Iterator>::value_type, hash_t>, int>::type = 0>
-    FileInfoPacket(std::string name, Iterator begin, Iterator end): name(name), chunk_list(begin, end) {}
+    FileInfoPacket(std::string name, uint32_t size, Iterator begin, Iterator end): name(name), size(size), chunk_list(begin, end) {}
     FileInfoPacket(tcp::socket& socket, boost::asio::yield_context yield);
     void write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const;
 };

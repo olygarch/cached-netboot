@@ -119,7 +119,7 @@ void Server<UI>::run() {
         files.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(filename),
-            std::forward_as_tuple(filename, chunk_list.begin(), chunk_list.end()));
+            std::forward_as_tuple(filename, file_size(x), chunk_list.begin(), chunk_list.end()));
     }
     ui.log("File list complete!");
 

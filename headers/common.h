@@ -14,18 +14,18 @@ const static short client_port = 8546;
 
 class sha224_t: public std::array<uint8_t, 28> {};
 
-class rollh_t: public std::array<uint8_t, 4> {};
-
 struct hash_t {
-    rollh_t weak_hash;
+    uint32_t weak_hash;
     sha224_t strong_hash;
     hash_t() {}
     hash_t(tcp::socket& socket, boost::asio::yield_context yield);
-    hash_t(rollh_t weak, sha224_t strong): weak_hash(weak), strong_hash(strong) {}
+    hash_t(uint32_t weak, sha224_t strong): weak_hash(weak), strong_hash(strong) {}
     void write_to_socket(tcp::socket& socket, boost::asio::yield_context yield) const;
     bool operator==(const hash_t& other) const {
         return weak_hash == other.weak_hash && strong_hash == other.strong_hash;
     }
+    void print() const;
+    uint32_t get_weak_hash() const;
 };
 
 namespace std {
@@ -33,7 +33,7 @@ namespace std {
     class hash<hash_t>{
     public:
         size_t operator()(const hash_t& hash) const noexcept {
-            return *((size_t*) &hash);
+            return hash.weak_hash;
         }
     };
     template <>

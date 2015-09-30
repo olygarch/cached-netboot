@@ -31,7 +31,7 @@ class Hasher {
 public:
     Hasher(size_t window_length);
     void update(const uint8_t* begin, const uint8_t* end);
-    rollh_t get_weak_hash() const;
+    uint32_t get_weak_hash() const;
     hash_t get_strong_hash() const;
     Chunk get_chunk() const;
     ~Hasher();

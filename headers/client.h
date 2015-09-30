@@ -47,7 +47,7 @@ void Client<UI>::run(bool forever) {
         }
     };
 
-    auto server_communication_handler = [this, &server_socket, &io_service, &chunk_data_sender] (boost::asio::yield_context yield) {
+    auto server_communication_handler = [this, &forever, &server_socket, &io_service, &chunk_data_sender] (boost::asio::yield_context yield) {
         try {
             server_socket.async_connect(tcp::endpoint(server_ip, server_port), yield);
             for (auto& x: files_to_get) {
@@ -58,6 +58,7 @@ void Client<UI>::run(bool forever) {
                 switch (type) {
                     case file_info: {
                         FileInfoPacket packet(server_socket, yield);
+                        ui.log("Received file info (" + packet.name + ") from server!");
                         files.emplace(
                             std::piecewise_construct,
                             std::forward_as_tuple(packet.name),
@@ -88,6 +89,11 @@ void Client<UI>::run(bool forever) {
                     }
                 }
                 ui.report_status(files);
+                if (forever) continue;
+                if (files_to_get.size() == files.size() && chunk_files.size() == present_chunks.size()) {
+                    io_service.stop();
+                    break;
+                }
             }
         } catch (const std::exception& e) {
             ui.log("Server communication: " + std::string(e.what()));
@@ -130,8 +136,7 @@ void Client<UI>::run(bool forever) {
                 }
                 ui.report_status(files);
                 if (forever) continue;
-                if (chunk_files.size() == present_chunks.size()) {
-                    ui.log("Stopping...");
+                if (files_to_get.size() == files.size() && chunk_files.size() == present_chunks.size()) {
                     io_service.stop();
                     break;
                 }

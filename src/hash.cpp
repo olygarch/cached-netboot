@@ -175,6 +175,7 @@ Hasher::Hasher(size_t wlen) {
     window = new uint8_t[wlen*2];
     mult = 1;
     for (i=0; i<window_length; i++) mult *= MULTIPLIER;
+    hash = 0;
 }
 
 Hasher::~Hasher() {
@@ -200,10 +201,8 @@ void Hasher::update(const uint8_t* begin, const uint8_t* end) {
     }
 }
 
-rollh_t Hasher::get_weak_hash() const {
-    rollh_t result;
-    memcpy(&result[0], &hash, sizeof hash);
-    return result;
+uint32_t Hasher::get_weak_hash() const {
+    return hash;
 }
 
 hash_t Hasher::get_strong_hash() const {
