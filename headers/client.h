@@ -141,6 +141,10 @@ void Client<UI>::run(bool forever) {
                     break;
                 }
             }
+        } catch (const boost::system::system_error& e) {
+            if (e.code() != boost::asio::error::eof) {
+            ui.log("Client communication: " + std::string(e.what()));
+            }
         } catch (const std::exception& e) {
             ui.log("Client communication: " + std::string(e.what()));
         }
