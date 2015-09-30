@@ -18,6 +18,7 @@ class Client {
     std::unordered_map<std::string, File> files;
     address server_ip;
     std::unordered_map<hash_t, std::vector<File*>> chunk_files;
+    std::unordered_map<address, tcp::socket> client_sockets;
     std::unordered_set<hash_t> present_chunks;
     std::vector<std::string> files_to_get;
     UI ui;
@@ -37,13 +38,22 @@ void Client<UI>::run(bool forever) {
     boost::asio::io_service::strand server_strand(io_service);
 
     auto chunk_data_sender = [this, &io_service] (SendChunkPacket packet, boost::asio::yield_context yield) {
-        try {
-            ChunkDataPacket output(chunk_files[packet.chunk][0]->get_chunk_data(packet.chunk));
-            tcp::socket peer_socket(io_service);
-            peer_socket.async_connect(tcp::endpoint(packet.receiver, client_port), yield);
-            send_packet(peer_socket, yield, output);
-        } catch (const std::exception& e) {
-            ui.log("Send packet: " + std::string(e.what()));
+        for (size_t i=0; i<n_retries; i++) {
+            try {
+                ChunkDataPacket output(chunk_files[packet.chunk][0]->get_chunk_data(packet.chunk));
+                if (!client_sockets.count(packet.receiver)) {
+                    client_sockets.emplace(
+                        std::piecewise_construct,
+                        std::forward_as_tuple(packet.receiver),
+                        std::forward_as_tuple(io_service));
+                    client_sockets.at(packet.receiver).async_connect(tcp::endpoint(packet.receiver, client_port), yield);
+                }
+                send_packet(client_sockets.at(packet.receiver), yield, output);
+                break;
+            } catch (const std::exception& e) {
+                ui.log("Send packet: " + std::string(e.what()));
+                client_sockets.erase(packet.receiver);
+            }
         }
     };
 
@@ -123,6 +133,7 @@ void Client<UI>::run(bool forever) {
                         for (auto x: chunk_files.at(hash)) {
                             x->write_chunk(packet.get_chunk(), hash);
                         }
+                        present_chunks.insert(hash);
                         boost::asio::spawn(server_strand, std::bind(new_chunk_sender, hash, _1));
                         break;
                     }
@@ -140,10 +151,6 @@ void Client<UI>::run(bool forever) {
                     io_service.stop();
                     break;
                 }
-            }
-        } catch (const boost::system::system_error& e) {
-            if (e.code() != boost::asio::error::eof) {
-            ui.log("Client communication: " + std::string(e.what()));
             }
         } catch (const std::exception& e) {
             ui.log("Client communication: " + std::string(e.what()));

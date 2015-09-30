@@ -57,7 +57,7 @@ void File::set_chunks_from_list(const std::vector<hash_t>& chunks) {
     }
     const auto& old_chunks = get_chunk_list();
     if (chunks == old_chunks) {
-        for (auto& hash: chunks) {    
+        for (auto& hash: chunks) {
             present_chunks.insert(hash);
         }
         return;
@@ -66,23 +66,21 @@ void File::set_chunks_from_list(const std::vector<hash_t>& chunks) {
     for (size_t i=0; i<old_chunks.size(); i++) {
         already_present[old_chunks[i]].insert(data+chunk_max_size*i);
     }
-    for (size_t i=0; i<chunks.size(); i++) {
-        chunk_positions[chunks[i]].push_back(data+chunk_max_size*i);
-    }
-    std::unordered_set<uint32_t> weak_present;
+    std::unordered_set<uint32_t> weak_needed;
     for (auto& x: chunks) {
-        weak_present.insert(x.weak_hash);
+        weak_needed.insert(x.weak_hash);
     }
     for (size_t pos=0; pos<size(); pos++) {
         Hasher hasher(chunk_max_size);
         hasher.update(data+pos, std::min(data+pos+chunk_max_size, data+size()));
         pos += chunk_max_size;
-        while (pos < size() && (!weak_present.count(hasher.get_weak_hash()) || !chunk_positions.count(hasher.get_strong_hash()))) {
+        while (pos < size() && (!weak_needed.count(hasher.get_weak_hash()) || !chunk_positions.count(hasher.get_strong_hash()))) {
             hasher.update(data+pos, data+pos+1);
             pos++;
         }
         if (chunk_positions.count(hasher.get_strong_hash())) {
             write_chunk(hasher.get_chunk(), hasher.get_strong_hash(), already_present[hasher.get_strong_hash()]);
+            weak_needed.erase(hasher.get_weak_hash());
             pos -= chunk_max_size;
         }
     }

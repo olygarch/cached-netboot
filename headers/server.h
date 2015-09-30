@@ -18,7 +18,7 @@ using namespace boost::asio::ip;
 template<class UI = DefaultUI>
 class Server {
     std::string base_dir;
-    std::unordered_set<address> is_busy;
+    std::unordered_multiset<address> is_busy;
     std::unordered_map<address, ClientStatus> clients;
     std::unordered_map<std::string, FileInfoPacket> files;
     UI ui;
@@ -147,6 +147,7 @@ void Server<UI>::run() {
                             }
                             send_packet(socket, yield, files.at(packet.name));
                         }
+                        is_busy.insert(addr);
                         break;
                     }
                     case chunk_list: {
@@ -154,12 +155,17 @@ void Server<UI>::run() {
                         for (auto& x: packet.chunks) {
                             clients.at(addr).chunks_owned.insert(x);
                         }
+                        if (is_busy.count(addr)) {
+                            is_busy.erase(is_busy.find(addr));
+                        }
                         break;
                     }
                     case new_chunk: {
                         NewChunkPacket packet(socket, yield);
                         clients.at(addr).chunks_owned.insert(packet.chunk);
-                        is_busy.erase(addr);
+                        if (is_busy.count(addr)) {
+                            is_busy.erase(is_busy.find(addr));
+                        }
                         break;
                     }
                     case error: {
@@ -183,7 +189,9 @@ void Server<UI>::run() {
         } catch (std::exception& e) {
             ui.log("Error handling client: " + std::string(e.what()));
             clients.erase(addr);
-            is_busy.erase(addr);
+            if (is_busy.count(addr)) {
+                is_busy.erase(is_busy.find(addr));
+            }
             if (is_busy.empty()) {
                 for (auto& x: get_chunks_to_send()) {
                     boost::asio::spawn(clients.at(x.first).strand, std::bind(send_chunk_sender, x.first, x.second.first, x.second.second, _1));
@@ -199,7 +207,6 @@ void Server<UI>::run() {
             for (;;) {
                 tcp::socket socket(io_service);
                 acceptor.async_accept(socket, yield);
-                fprintf(stderr, "Client connected!");
                 address addr = socket.remote_endpoint().address();
                 clients.emplace(addr, std::move(ClientStatus(std::move(socket), io_service)));
                 boost::asio::spawn(io_service, std::bind(client_manager, addr, _1));

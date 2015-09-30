@@ -174,7 +174,7 @@ Hasher::Hasher(size_t wlen) {
     window_end = 0;
     window = new uint8_t[wlen*2];
     mult = 1;
-    for (i=0; i<window_length; i++) mult *= MULTIPLIER;
+    for (i=1; i<window_length; i++) mult *= MULTIPLIER;
     hash = 0;
 }
 

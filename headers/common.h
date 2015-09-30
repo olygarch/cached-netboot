@@ -9,6 +9,7 @@
 using namespace boost::asio::ip;
 
 const static size_t chunk_max_size = 0x00100000;
+const static size_t n_retries = 5;
 const static short server_port = 5124;
 const static short client_port = 8546; 
 
